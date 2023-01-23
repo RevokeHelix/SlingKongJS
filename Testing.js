@@ -7,7 +7,7 @@ canvas.style.position = 'fixed';
 document.body.appendChild(canvas);
 
 class ball{
-    constructor(x,y,vx,vy,radius,mass,initVX,initVY){
+    constructor(x,y,vx,vy,radius,mass,initVX,initVY,initx,inity){
         this.x = x;
         this.y = y;
         this.vx = vx;
@@ -16,33 +16,73 @@ class ball{
         this.mass = mass;
         this.initVX = initVX;
         this.initVY = initVY;
+        this.initx = initx;
+        this.inity = inity;
     }
 }
 
-ball1 = new ball(canvas.width/2,canvas.height/2,2,100,10,3,0,0)
-const initx = canvas.width/2;
-const inity = canvas.height/2
+class grip{
+    constructor(x,y){
+        this.x=x;
+        this.y=y;
+    }
+    drawGrip(camera) {
+        ctx.beginPath();
+        ctx.fillStyle = 'blue';
+        ctx.stroke();
+        ctx.arc(this.x, this.y-camera.offsety, 20, 0, 2*Math.PI);
+        ctx.fill();
+        ctx.stroke();
+        ctx.closePath();
+      }
+      isInRadius(x,y,ball) {
+        if (Math.abs(this.x-x) < 40 && Math.abs(this.y-y) < 40){
+            console.log('is in radius')
+            ball.initx = x;
+            ball.inity = y;
+            ball.initVX = 5;
+            ball.initVY = 5;
+            Released = false;
+        }
+      }
+}
+
+class camera{
+    constructor(offsety){
+        this.offsety = offsety;
+    }
+
+    Update(ball){
+        this.offsety = ball.y-canvas.height/2;
+    }
+}
+
+let ball1 = new ball(canvas.width/2,canvas.height/2,2,100,10,3,0,0,canvas.width/2,canvas.height/2)
 const acceleration = -10;
 var dt = 0;
 var Released = false;
 let angle = 0;
-const SpringConst = 0.7;
+const SpringConst = 1.5;
 let Force = 0;
+let grip1 = null;
+let PlayerCamera = new camera(0)
 
-async function Setup(x1,y1,x2,y2) {
+async function Setup() {
+    grip1 = new grip(400,400);
+    grip1.drawGrip(PlayerCamera)
 }
     
 
-function DrawBall(ball) {
+function DrawBall(ball,camera) {
     ctx.beginPath();
     ctx.fillStyle = 'red';
-    ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+    ctx.arc(ball.x, ball.y-camera.offsety, ball.radius, 0, Math.PI * 2);
     ctx.fill();
     ctx.closePath();
 
     if (!Released){
         ctx.beginPath();
-        ctx.moveTo(canvas.width/2, canvas.height/2);
+        ctx.moveTo(ball.initx, ball.inity);
         ctx.lineTo(ball.x, ball.y);
         ctx.stroke();
     }
@@ -52,6 +92,7 @@ function GetVelocityY(ball,initialVelocity,time,theta){
     if (ball.y >= canvas.height){
         return 0
     }
+    console.debug(initialVelocity*Math.sin(theta)+acceleration*time)
     return Math.ceil(initialVelocity*Math.sin(theta)+acceleration*time)
 }
 
@@ -73,7 +114,6 @@ function UpdateBall(ball,launched) {
         }
         if (ball.x-100 < 0){
             ball.initvx *= 0
-            console.debug('hello')
         }
         if (ball.y > canvas.height){
             ball.y = canvas.height;
@@ -104,17 +144,17 @@ function Clicked(e){
 }
 
 function CalculateVector(ball,x,y) {
-    let VectorY = y-inity
-    let VectorX = x-initx
+    let VectorY = y-ball.inity
+    let VectorX = x-ball.initx
     let NewVector = [VectorX,VectorY]
-    const NormalVector = [1,0]
+    console.log(NewVector)
     let Length = Math.sqrt(Math.pow(NewVector[0],2)+Math.pow(NewVector[1],2))
     angle = Math.acos((NewVector[0])/Length)
-    Force = SpringConst*Length
+    Force = (SpringConst)*Length
     VelocityXY = Math.sqrt(2*Force/ball.mass)
     ball.initVX = VelocityXY*Math.cos(angle);
     ball.initVY = VelocityXY*Math.sin(angle);
-    console.debug(angle)
+    console.log(ball.initVX,ball.initVY)
     if (angle < Math.PI/2){
         ball.initVX *= -1;
     }
@@ -126,10 +166,10 @@ function CalculateVector(ball,x,y) {
 
 function UnfollowBall(e) {
     Released = true;
-    CalculateVector(ball1,e.clientX,e.clientY)
-    window.removeEventListener("click",Clicked,false)
-    window.removeEventListener("mousemove",FollowBall,false)
-    window.removeEventListener("mouseup",UnfollowBall,false)
+    CalculateVector(ball1,e.clientX,e.clientY);
+    window.removeEventListener("click",Clicked,false);
+    window.removeEventListener("mousemove",FollowBall,false);
+    window.removeEventListener("mouseup",UnfollowBall,false);
 }
 
 function FollowBall(e) {
@@ -138,19 +178,29 @@ function FollowBall(e) {
     window.addEventListener("mouseup",UnfollowBall)
 }
 
+function UpdateObjects(){
+    if (Released === true){
+        UpdateBall(ball1,Released);
+        PlayerCamera.Update(ball1);
+}
+}
+
 function GameLoop() {
     ctx.beginPath();
     ctx.rect(0, 0, window.innerWidth, window.innerHeight);
     ctx.fillStyle = "white";
     ctx.fill();
     ctx.closePath();
-    DrawBall(ball1);
-    UpdateBall(ball1,Released);
+    DrawBall(ball1,PlayerCamera);
+    grip1.drawGrip(PlayerCamera);
+    UpdateObjects();
+    grip1.isInRadius(ball1.x,ball1.y,ball1);
     if (Released === false){
         window.addEventListener("click", Clicked)
     }
+    console.log(Released)
     requestAnimationFrame(GameLoop);
 }
 
-Setup(0,0,100,100)
+Setup()
 GameLoop()
